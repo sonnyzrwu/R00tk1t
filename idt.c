@@ -14,6 +14,17 @@
 
 
 // The base address of the IDT
+// This was obtained by using WinDbg to inspect the IDT base address in the kernel memory space.
+// Ensure that you can ping your host from your VM.
+// Run kdnet.exe HOST_IP HOST_PORT from the VM to connect to the host.
+// KDNET should configure the target and give you a key resembling: Key=RANDOM_GIBBERISH
+// Then, in WinDbg, go to File -> Attach to a Kernel. Enter HOST_PORT and HOST_KEY.
+// Shutdown the VM using shutdown -r -t 0 whilst WinDbg is waiting for a connection.
+// At this point, run in WinDbg:
+// .sympath srv*
+// .reload
+// Finally, we can run: `!idt`
+
 #define IDT_BASE UINT64_C(0xfffff8068108f000)
 // The number of vectors in the IDT
 #define IDT_VECTOR_COUNT 256u
