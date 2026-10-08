@@ -1,6 +1,6 @@
 
 
-Compile the Rootkit Instructions:
+Compile the IAT Rootkit Instructions:
 
 g++ -shared -o evil.dll .\evil.c 
 
