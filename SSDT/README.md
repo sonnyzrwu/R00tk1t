@@ -6,7 +6,7 @@ Stop Code: SYSTEM THREAD EXCEPTION NOT HANDLED (0x7E)
 Tricky part is finding the SSDT itself. 32 bit OS exports such objects.
 64 bit doesn't. 
 
-Next courses of action: Either find another way to look for SSDT, or debug FindSSDT(). Another option is to simply set a breakpoint at load, and then step through to find the cause.
+Next courses of action: Either find another way to look for SSDT, or debug FindSSDT(). Another option is to simply set a breakpoint at load, and then step through to find the cause. Option 3 is to downgrade to an even dumber version of Windows, or make it 32 bit so you can simply read the exported SSDT from the kernel.
 
 This guy actually managed to defeat PatchGuard!!!
 https://github.com/0xflux/Hells-Hollow/blob/master/readme.md
