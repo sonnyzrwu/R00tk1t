@@ -8,4 +8,7 @@ Tricky part is finding the SSDT itself. 32 bit OS exports such objects.
 
 Next courses of action: Either find another way to look for SSDT, or debug FindSSDT(). Another option is to simply set a breakpoint at load, and then step through to find the cause.
 
+This guy actually managed to defeat PatchGuard!!!
 https://github.com/0xflux/Hells-Hollow/blob/master/readme.md
+https://fluxsec.red/hells-hollow-a-new-SSDT-hooking-technique-with-alt-syscalls-rootkit
+
