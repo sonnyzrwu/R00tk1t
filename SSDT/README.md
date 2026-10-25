@@ -7,3 +7,5 @@ Tricky part is finding the SSDT itself. 32 bit OS exports such objects.
 64 bit doesn't. 
 
 Next courses of action: Either find another way to look for SSDT, or debug FindSSDT(). Another option is to simply set a breakpoint at load, and then step through to find the cause.
+
+https://github.com/0xflux/Hells-Hollow/blob/master/readme.md
