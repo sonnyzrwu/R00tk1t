@@ -1,4 +1,6 @@
 
 TO DO LIST:
-Find out why keylog.txt isn't being created and written to.
-Substitute CreateThread with CreateRemoteThread to target svchost.ext to see if you can track keystrokes in a remote process?
+
+GetProcAddress error 127: Can't find Keylogger.
+Dig deeper about DLL Export functions.
+Additionally, draw a mental map of where everything is.
