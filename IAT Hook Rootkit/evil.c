@@ -24,11 +24,11 @@ BOOL hookCreateProcessW(
     LPPROCESS_INFORMATION lpProcessInformation
 ){
     
-    int result = MessageBoxA(
+    MessageBoxA(
         NULL, // No owner window
         "You have been pwned!", // Message text
         "Confirmation", // Title of the message box
-        MB_OKCANCEL | MB_ICONQUESTION // Buttons and icon type
+        MB_OK // Buttons and icon type
     );
 
     printf("CreateProcessW hooked!");
@@ -102,13 +102,14 @@ void HookIatApi(LPCSTR functionToHook ){
                     // Overwrite the function pointer in the IAT with the address of our custom function
                     firstThunk->u1.Function = (DWORD_PTR)hookCreateProcessW;    
                     printf("IAT Successfully hooked!!! Nothing happened... Shhhhhhhh \n");
-                    MessageBoxA(
-                        NULL,
-                        "IAT Successfully hooked!!! Nothing happened... Shhhhhhhh",
-                        "Success",
-                        MB_OK
-                    );
-                    return;
+                    char dllmsg[256];
+                    sprintf(dllmsg,
+                        "CreateProcessW hooked in DLL=%s\n",
+                        dllName);
+                    // CreateProcessW hooked in
+                    // DLL=api-ms-win-core-processthreads-l1-1-0.dll
+                    MessageBoxA(NULL, dllmsg, "Debug", MB_OK);
+                    
                 } // if strcmp
 
             } // end if 
