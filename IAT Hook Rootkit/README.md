@@ -1,4 +1,7 @@
 
+This Rootkit Prototype Hooks the IAT of "explorer.exe", specifically hooking the API call CreateProcessW.
+We confirm that we have successfully hooked the victim's IAT.
+
 TO DO LIST:
 
 GetProcAddress error 127: Can't find Keylogger.
