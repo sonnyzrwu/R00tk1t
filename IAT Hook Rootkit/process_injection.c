@@ -38,6 +38,7 @@ HANDLE ProcessInjection( DWORD PID, SIZE_T SIZE, LPCSTR pDllPath, LPCSTR moduleN
     }
 
     HANDLE hRemoteThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE) pLoadLibrary, pBaseAddress, 0 , NULL );
+    printf("Successful process injection.");
     return hRemoteThread;
 }
 

