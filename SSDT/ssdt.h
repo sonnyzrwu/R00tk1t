@@ -32,9 +32,8 @@ fffff802`724d6a80  06209503`05901300 07fa5400`05732400
 PVOID GetKeAddSystemServiceTableAddress();
 PVOID GetSSDT(PVOID KeAddSystemServiceTable);
 
-extern void disableWP_CR0();
-
-extern void enableWP_CR0();
+extern "C" void disableWP_CR0();
+extern "C" void enableWP_CR0();
 
 struct SYSTEM_SERVICE_TABLE {
     PULONGLONG KiServiceTable; // SSDT

@@ -28,5 +28,6 @@ enableWP_CR0 PROC
 	or rbx, 000010000h
 	mov cr0, rbx
 	pop rbx
+	ret
 enableWP_CR0 ENDP
 END

@@ -1,6 +1,6 @@
 
 #include "ssdt.h"
-
+ 
 DRIVER_UNLOAD DriverUnload;
 VOID DriverUnload (
 	_In_ _DRIVER_OBJECT *DriverObject
@@ -9,18 +9,25 @@ VOID DriverUnload (
 	DbgPrint("[SSDT] Driver unloading. \n");
 }
 
+
+
+ 
+extern "C" void disableWP_CR0();
+extern "C" void enableWP_CR0();
 extern "C"
 NTSTATUS DriverEntry( 
 	_In_ PDRIVER_OBJECT DriverObject,
 	_In_ PUNICODE_STRING RegistryPath
 ) {
+
+	
 	UNREFERENCED_PARAMETER(RegistryPath);
 
 	DriverObject->DriverUnload = DriverUnload;
 	PVOID KeAddSystemServiceTableAddress = GetKeAddSystemServiceTableAddress();
 
 	SERVICE_DESCRIPTOR_TABLE* ServiceDescriptorTable = (SERVICE_DESCRIPTOR_TABLE*) GetSSDT( KeAddSystemServiceTableAddress);
-
+	DbgPrint("KeServiceDescriptorTable Address %p \r\n", ServiceDescriptorTable);
 	DbgPrint("KeServiceDescriptorTable ServiceTable  %p \r\n", ServiceDescriptorTable->nt);
 	DbgPrint("KeServiceDescriptorTable Count         %p \r\n", ServiceDescriptorTable->win32k);
 	DbgPrint("KeServiceDescriptorTable Limit         %016x \r\n", ServiceDescriptorTable->sst3);
@@ -38,6 +45,14 @@ NTSTATUS DriverEntry(
 	fffff803`e66018d0  00000000`000001e9 fffff803`e54db568
 	
 	*/
+	disableWP_CR0();
 
+
+
+
+
+
+	enableWP_CR0();
+	
 	return STATUS_SUCCESS;
 }
