@@ -34,6 +34,8 @@ PVOID GetSSDT(PVOID KeAddSystemServiceTable);
 
 extern void disableWP_CR0();
 
+extern void enableWP_CR0();
+
 struct SYSTEM_SERVICE_TABLE {
     PULONGLONG KiServiceTable; // SSDT
     PULONGLONG CounterBaseTable;
