@@ -1,4 +1,4 @@
-
+Update: 2026-10-29
 Detonated on Windows 10 and Windows 11 victim machines, blue screened.
 
 Stop Code: SYSTEM THREAD EXCEPTION NOT HANDLED (0x7E)
@@ -31,4 +31,15 @@ KeServiceDescriptorTable Limit         00000000000001e9
 KeServiceDescriptorTable ArgumentTable FFFFF803E54DB568 
 
 Break instruction exception - code 80000003 (first chance)
+
+
+Update: 2026-11-08
+
+Obtained the error:
+
+
+>sc start [NAMEOFFILE] [SC] StartService FAILED 577: Windows cannot verify the digital signature for this file. A recent hardware or software change might have installed a file that is signed incorrectly or damaged, or that might be malicious software from an unknown source.
+
+FIND ANOTHER WAY TO DETONATE
+
 
