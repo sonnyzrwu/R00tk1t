@@ -12,3 +12,23 @@ This guy actually managed to defeat PatchGuard!!!
 https://github.com/0xflux/Hells-Hollow/blob/master/readme.md
 https://fluxsec.red/hells-hollow-a-new-SSDT-hooking-technique-with-alt-syscalls-rootkit
 
+
+Update: 2026-11-07, We found the SSDT!
+
+0: kd> dq nt!KeServiceDescriptorTable L4
+
+fffff803`e66018c0  fffff803`e54dadc0 00000000`00000000
+
+fffff803`e66018d0  00000000`000001e9 fffff803`e54db568
+
+0: kd> g
+KeServiceDescriptorTable ServiceTable  FFFFF803E54DADC0 
+
+KeServiceDescriptorTable Count         0000000000000000 
+
+KeServiceDescriptorTable Limit         00000000000001e9 
+
+KeServiceDescriptorTable ArgumentTable FFFFF803E54DB568 
+
+Break instruction exception - code 80000003 (first chance)
+
