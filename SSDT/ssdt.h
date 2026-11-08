@@ -1,9 +1,7 @@
-
+#include <wdm.h>
 #include <ntddk.h>
 #include <wdf.h>
 #include <intrin.h>
-
-
 /*
 0: kd> u nt!KiSystemServiceRepeat
 nt!KiSystemServiceRepeat:
@@ -31,8 +29,8 @@ fffff802`724d6a70  0559cb01`0532d302 05b70305`05b08501
 fffff802`724d6a80  06209503`05901300 07fa5400`05732400
 
 */
-
-PULONGLONG FindSSDT();
+PVOID GetKeAddSystemServiceTableAddress();
+PVOID GetSSDT(PVOID KeAddSystemServiceTable);
 
 struct SYSTEM_SERVICE_TABLE {
     PULONGLONG KiServiceTable; // SSDT

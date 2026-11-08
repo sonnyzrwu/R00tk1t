@@ -1,4 +1,38 @@
 #include "ssdt.h"
+/*
+	------------------
+	kd> u nt!KeAddSystemServiceTable+0xbd L1
+	nt!KeAddSystemServiceTable+0xbd:
+	fffff800`aae7bdcd 48391d0c5b7800  cmp     qword ptr [nt!KeServiceDescriptorTable+0x20 (fffff800`ab6018e0)],rbx
+	------------------
+
+	We will dynamically obtain the address of the SSDT by reading the opcodes at this address by the KeAddSystemServiceTable address.
+
+*/
+
+/*
+PVOID GetSSDTAddress(PVOID KeAddSystemServiceAddr) {
+
+PVOID AddressToRead = NULL;
+PVOID NewAddress = NULL;
+PBYTE Instruction = (PBYTE)KeAddSystemServiceAddr + 0xbd;
+
+// Get Offset Address 
+DWORD OffsetAddress = *(PDWORD)(Instruction + 3);
+
+// Calculate RIP 
+UINT_PTR rip = (UINT_PTR)Instruction + 7;
+
+// Add Offset Address to RIP 
+AddressToRead = (PVOID)(rip + (INT32)OffsetAddress);
+
+// Get Absolute Address 
+AddressToRead = (PVOID)((PBYTE)AddressToRead - 0x20);
+
+NewAddress = GetAddress(AddressToRead);
+
+return NewAddress;
+}
 
 
 /*
@@ -29,27 +63,44 @@ fffff802`724d6a80  06209503`05901300 07fa5400`05732400
 
 */
 
-PULONGLONG FindSSDT() {
-	/*
-	IA32_LSTAR is a 64-bit model-specific register (MSR), at index 0xC0000082. When a program executes the x64 SYSCALL instruction,
-	the CPU loads the instruction pointer (RIP) from this register and begins executing at that kernel entry address.*/
-	ULONGLONG  KiSystemCall64 = __readmsr(0xC0000082);	// Get the address of nt!KeSystemCall64
-	ULONGLONG  KiSystemServiceRepeat = 0;
-	INT64 Limit = 4096; // 2^12 Page Size, roughly estimated. INCREASE if it doesn't work.
-
-	for (INT64 i = 0; i < Limit; i++) {		        // Increase that address until you hit "0x4c/0x8d/0x15"
-		if (*(PUINT8)(KiSystemCall64 + i) == 0x4C
-			&& *(PUINT8)(KiSystemCall64 + i + 1) == 0x8D
-			&& *(PUINT8)(KiSystemCall64 + i + 2) == 0x15)
-		{
-			KiSystemServiceRepeat = KiSystemCall64 + i;
-			DbgPrint("KiSystemCall64           %p \r\n", (PULONGLONG) KiSystemCall64);
-			DbgPrint("KiSystemServiceRepeat    %p \r\n", (PULONGLONG) KiSystemServiceRepeat);
-
-			// Convert relative address to absolute address
-			return (PULONGLONG)(*(PINT32)(KiSystemServiceRepeat + 3) + KiSystemServiceRepeat + 7);
-		}
+PVOID GetKeAddSystemServiceTableAddress() {
+	UNICODE_STRING KeAddSystemServiceTable;
+	RtlInitUnicodeString(&KeAddSystemServiceTable, L"KeAddSystemServiceTable");
+	PVOID KeAddSystemServiceTableAddress = MmGetSystemRoutineAddress(&KeAddSystemServiceTable);
+	if (KeAddSystemServiceTableAddress == NULL) {
+		return NULL;
 	}
+	return KeAddSystemServiceTableAddress;
+}
 
-	return nullptr;
+PVOID GetSSDT( PVOID KeAddSystemServiceTable  ) {
+	//PVOID KeServiceDescriptorTableAddress = NULL;
+
+	// We wish to advance memory by 0xbd BYTEs. 
+	// Pointer arithmetic is determined by the pointer's type.
+	// Therefore, we cast to BYTE *
+	BYTE * TargetInstructionAddress = (BYTE *) KeAddSystemServiceTable + 0xbd;
+
+	// 48 38 1D 0D 5B 78 00
+	// 0  1  2  3			<---- 0xfff..... Memory offset/indicies
+	// We wish to obtain 0D 5B 78 00 which occurs at Byte 3
+	// Offset in Little Endian, -> [Offset] = 00785B0D, a SIGNED value
+	INT32 Offset;
+	memcpy(&Offset, TargetInstructionAddress + 3, sizeof(Offset));
+
+	// In x64, RIP-relative addressing calculates the effective address using:
+	// RIP_next + Offset = EffectiveAddress
+	// RIP_next = RIP_curr + 7 = TargetInstructionAddress + 7
+	// 48 38 1D 0D 5B 78 00 [RIP_next]
+	// 0  1  2  3  4  5  6  7			<---- 0xfff..... Memory offset/indicies
+	UINT_PTR EffectiveAddress = (UINT_PTR) (TargetInstructionAddress + 7) ; // UINT_PTR is an Integer designed to hold a pointer.
+
+	// nt!KeServiceDescriptorTable+0x20 (fffff806`a3c018e0) <------ Debugger Recognizes This Symbol
+	// Integer arithmetic  was chosen due to the Little Endian format.
+	PVOID AddressOfSSDTPlus20 = (PVOID) (EffectiveAddress + (INT32)Offset); // If this doesn't work, try: (INT_PTR)(INT32)Offset
+
+	PVOID AddressOfSSDT = PVOID( (BYTE*)AddressOfSSDTPlus20 - 0x20);
+
+	return AddressOfSSDT;
+	
 }
